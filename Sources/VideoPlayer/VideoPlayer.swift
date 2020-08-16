@@ -58,9 +58,14 @@ struct VideoViewController: UIViewControllerRepresentable {
 
 public struct VideoPlayer: View {
   @State var url: URL
-  @State var rotateOnFullscreen = false
-  let viewControllerHandler: (AVPlayerViewController) -> Void = { _ in }
-  
+  @State var rotateOnFullscreen: Bool
+  let viewControllerHandler: (AVPlayerViewController) -> Void
+    
+  public init(url: URL, rotateOnFullscreen: Bool = false,  viewControllerHandler: @escaping (AVPlayerViewController) -> Void  =  { _ in }) {
+    self._url = State(initialValue: url)
+    self._rotateOnFullscreen = State(initialValue: rotateOnFullscreen)
+    self.viewControllerHandler = viewControllerHandler
+  }
 
   public var body: some View {
     return GeometryReader { geometry in
