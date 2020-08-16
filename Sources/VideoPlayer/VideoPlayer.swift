@@ -56,13 +56,13 @@ struct VideoViewController: UIViewControllerRepresentable {
   }
 }
 
-struct VideoPlayer: View {
+public struct VideoPlayer: View {
   @State var url: URL
   @State var rotateOnFullscreen = false
   let viewControllerHandler: (AVPlayerViewController) -> Void = { _ in }
   
 
-  var body: some View {
+  public var body: some View {
     return GeometryReader { geometry in
       VStack {
         self.body(for: geometry.size)
