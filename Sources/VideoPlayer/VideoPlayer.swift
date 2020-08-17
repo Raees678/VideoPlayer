@@ -2,10 +2,10 @@ import SwiftUI
 import UIKit
 import AVKit
 
-extension AVPlayerViewController: AVPlayerViewControllerDelegate {
+class Delegate: NSObject, AVPlayerViewControllerDelegate {
   public func playerViewController(_ playerViewController: AVPlayerViewController,
-                            willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-    let previousOrientation = self.view.window!.windowScene!.interfaceOrientation
+                                   willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+    let previousOrientation = playerViewController.view.window!.windowScene!.interfaceOrientation
     coordinator.animate(alongsideTransition: nil) { transitionContext in
       if previousOrientation.isPortrait {
         OrientationManager.previousOrientation = previousOrientation
@@ -15,7 +15,7 @@ extension AVPlayerViewController: AVPlayerViewControllerDelegate {
   }
   
   public func playerViewController(_ playerViewController: AVPlayerViewController,
-                            willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+                                   willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
     coordinator.animate(alongsideTransition: nil) { transitionContext in
       if OrientationManager.previousOrientation != nil {
         UIDevice.current.setValue(OrientationManager.previousOrientation!.rawValue, forKey: "orientation")
@@ -35,16 +35,16 @@ extension AVPlayerViewController {
 }
 
 struct VideoViewController: UIViewControllerRepresentable {
-  @Binding var url: URL
+  @Binding var player: AVPlayer
   @Binding var rotateOnFullscreen:  Bool
   let viewControllerHandler: (UIViewControllerType) -> Void
   typealias UIViewControllerType = AVPlayerViewController
   
   func makeUIViewController(context: Self.Context) -> Self.UIViewControllerType {
-    let player = AVPlayer(url: self.url)
+    let player = self.player
     let viewController = AVPlayerViewController()
     if self.rotateOnFullscreen {
-      let delegate =  viewController
+      let delegate =  Delegate()
       viewController.delegate = delegate
     }
     viewController.player = player
@@ -57,16 +57,20 @@ struct VideoViewController: UIViewControllerRepresentable {
 }
 
 public struct VideoPlayer: View {
-  @State var url: URL
+  @State var player: AVPlayer
   @State var rotateOnFullscreen: Bool
+  let widthMultiplier: CGFloat
+  let heightMultiplier: CGFloat
   let viewControllerHandler: (AVPlayerViewController) -> Void
-    
-  public init(url: URL, rotateOnFullscreen: Bool = false,  viewControllerHandler: @escaping (AVPlayerViewController) -> Void  =  { _ in }) {
-    self._url = State(initialValue: url)
+  
+  public init(player: AVPlayer, rotateOnFullscreen: Bool = false, widthMultiplier: CGFloat = 16, heightMultiplier: CGFloat = 9,  viewControllerHandler: @escaping (AVPlayerViewController) -> Void  =  { _ in }) {
+    self._player = State(initialValue: player)
+    self.widthMultiplier = widthMultiplier
+    self.heightMultiplier = heightMultiplier
     self._rotateOnFullscreen = State(initialValue: rotateOnFullscreen)
     self.viewControllerHandler = viewControllerHandler
   }
-
+  
   public var body: some View {
     return GeometryReader { geometry in
       VStack {
@@ -79,10 +83,13 @@ public struct VideoPlayer: View {
     let givenWidth = dimensions.width
     let givenHeight = dimensions.height
     
-    if 9 * givenWidth < 16 * givenHeight {
-      return VideoViewController(url: self.$url, rotateOnFullscreen: self.$rotateOnFullscreen, viewControllerHandler: self.viewControllerHandler).frame(width: givenWidth, height: (9/16) * givenWidth)
+    // if the givenWidth is the limiting dimension for an aspect fit
+    if self.heightMultiplier * givenWidth < self.widthMultiplier * givenHeight {
+      // use that as the limiting dimension and calculate a new height
+      return VideoViewController(player: self.$player, rotateOnFullscreen: self.$rotateOnFullscreen, viewControllerHandler: self.viewControllerHandler).frame(width: givenWidth, height: (self.heightMultiplier/self.widthMultiplier) * givenWidth)
     } else  {
-      return VideoViewController(url: self.$url, rotateOnFullscreen: self.$rotateOnFullscreen, viewControllerHandler: self.viewControllerHandler).frame(width: (16/9) * givenHeight, height: givenHeight)
+      // else use the height as the limiting dimension
+      return VideoViewController(player: self.$player, rotateOnFullscreen: self.$rotateOnFullscreen, viewControllerHandler: self.viewControllerHandler).frame(width: (self.widthMultiplier/self.heightMultiplier) * givenHeight, height: givenHeight)
     }
   }
 }
@@ -92,11 +99,11 @@ public struct VideoPlayer: View {
 struct VideoViewController_Previews: PreviewProvider {
   static var previews: some View {
     Group {
-      VideoPlayer(url: URL(string:"https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")!, rotateOnFullscreen: true)
+      VideoPlayer(player: AVPlayer(url: URL(string:"https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")!), rotateOnFullscreen: true)
         .previewLayout(PreviewLayout.fixed(width: 414, height: 818))
         .previewDisplayName("Width less than height")
-
-      VideoPlayer(url: URL(string:"https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")!, rotateOnFullscreen: true)
+      
+      VideoPlayer(player: AVPlayer(url:  URL(string:"https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")!), rotateOnFullscreen: true)
         .previewLayout(PreviewLayout.fixed(width: 616, height: 414))
         .previewDisplayName("Width more than height")
     }
