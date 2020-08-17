@@ -3,25 +3,6 @@ import UIKit
 import AVKit
 
 class Delegate: NSObject, AVPlayerViewControllerDelegate {
-  public func playerViewController(_ playerViewController: AVPlayerViewController,
-                                   willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-    let previousOrientation = playerViewController.view.window!.windowScene!.interfaceOrientation
-    coordinator.animate(alongsideTransition: nil) { transitionContext in
-      if previousOrientation.isPortrait {
-        OrientationManager.previousOrientation = previousOrientation
-        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
-      }
-    }
-  }
-  
-  public func playerViewController(_ playerViewController: AVPlayerViewController,
-                                   willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-    coordinator.animate(alongsideTransition: nil) { transitionContext in
-      if OrientationManager.previousOrientation != nil {
-        UIDevice.current.setValue(OrientationManager.previousOrientation!.rawValue, forKey: "orientation")
-      }
-    }
-  }
 }
 
 extension AVPlayerViewController {
@@ -35,6 +16,39 @@ extension AVPlayerViewController {
 }
 
 struct VideoViewController: UIViewControllerRepresentable {
+  
+  class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    var parent: VideoViewController
+    
+    init(_ parent: VideoViewController) {
+        self.parent = parent
+    }
+    
+    public func playerViewController(_ playerViewController: AVPlayerViewController,
+                                     willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+      let previousOrientation = playerViewController.view.window!.windowScene!.interfaceOrientation
+      coordinator.animate(alongsideTransition: nil) { transitionContext in
+        if previousOrientation.isPortrait && self.parent.rotateOnFullscreen {
+          OrientationManager.previousOrientation = previousOrientation
+          UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
+        }
+      }
+    }
+    
+    public func playerViewController(_ playerViewController: AVPlayerViewController,
+                                     willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+      coordinator.animate(alongsideTransition: nil) { transitionContext in
+        if OrientationManager.previousOrientation != nil && self.parent.rotateOnFullscreen {
+          UIDevice.current.setValue(OrientationManager.previousOrientation!.rawValue, forKey: "orientation")
+        }
+      }
+    }
+  }
+  
+  func makeCoordinator() -> Coordinator {
+    return Coordinator(self)
+  }
+  
   @Binding var player: AVPlayer
   @Binding var rotateOnFullscreen:  Bool
   let viewControllerHandler: (UIViewControllerType) -> Void
@@ -43,10 +57,7 @@ struct VideoViewController: UIViewControllerRepresentable {
   func makeUIViewController(context: Self.Context) -> Self.UIViewControllerType {
     let player = self.player
     let viewController = AVPlayerViewController()
-    if self.rotateOnFullscreen {
-      let delegate =  Delegate()
-      viewController.delegate = delegate
-    }
+    viewController.delegate = context.coordinator
     viewController.player = player
     viewControllerHandler(viewController)
     return viewController
